@@ -32,11 +32,14 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 /* Cofre */
 #cofre{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 #cofre.on{display:flex}
-.top{display:flex;align-items:center;gap:8px;padding:10px 14px 6px}
+.top{display:flex;align-items:center;gap:8px;padding:8px 10px 6px 14px}
 .top h1{flex:1;font-size:28px;margin:0}
-.ic{padding:6px 10px;color:var(--gold);font-size:16px}
-.seg{display:flex;margin:4px 14px 8px;background:var(--card);border-radius:9px;padding:2px}
-.seg button{flex:1;padding:7px;border-radius:7px;font-size:14px;color:var(--sub)}
+.ic{min-height:44px;padding:0 14px;border-radius:10px;background:var(--card);color:var(--gold);font-size:16px}
+.ic:active,.seg button:active,.cp:active{opacity:.5}
+.ic:disabled{opacity:.5}
+button{touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.seg{display:flex;margin:6px 14px 10px;background:var(--card);border-radius:12px;padding:3px}
+.seg button{flex:1;min-height:44px;border-radius:10px;font-size:16px;font-weight:600;color:var(--sub)}
 .seg button.on{background:#636366;color:#fff}
 #busca{margin:0 14px 8px;padding:9px 12px;border-radius:10px;border:0;background:var(--card);color:#fff;font-size:16px}
 #lista{flex:1;overflow:auto;padding:0 14px 30px}
@@ -49,7 +52,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .it .v{font-size:15px;color:var(--sub);font-family:ui-monospace,Menlo,monospace;word-break:break-all;margin-top:2px}
 .it .v.vis{color:#fff}
 .it .ex{font-size:12px;color:var(--sub);margin-top:4px}
-.cp{background:var(--card2);color:var(--gold);padding:7px 12px;border-radius:8px;font-size:14px;flex:0 0 auto}
+.cp{background:var(--card2);color:var(--gold);min-height:40px;padding:0 14px;border-radius:9px;font-size:15px;flex:0 0 auto}
 .cp.ok{color:var(--green)}
 .acts{display:flex;gap:6px;flex:0 0 auto}
 .gen{padding:4px 12px 12px;border-bottom:1px solid #2c2c2e;display:none}
@@ -111,10 +114,10 @@ $('bVolta').onclick=()=>{
   else{acum=0;voltas=[];ultVolta=0;$('tempo').textContent=fmt(0);$('voltas').innerHTML='';$('bVolta').textContent='Volta';$('bVolta').disabled=true}
 };
 
-/* ---------- Gesto secreto: segurar o visor por 1,5 s ---------- */
+/* ---------- Gesto secreto: segurar o visor por 0,6 s ---------- */
 let hold=0;
 const tempo=$('tempo');
-const startHold=e=>{clearTimeout(hold);hold=setTimeout(abrirCofre,1500)};
+const startHold=e=>{clearTimeout(hold);hold=setTimeout(abrirCofre,600)};
 const endHold=()=>clearTimeout(hold);
 tempo.addEventListener('touchstart',startHold,{passive:true});
 tempo.addEventListener('touchend',endHold);tempo.addEventListener('touchmove',endHold,{passive:true});tempo.addEventListener('touchcancel',endHold);
@@ -130,8 +133,10 @@ lerCfgDoLink();
 
 /* ---------- Cofre ---------- */
 let aba='s',dados=LS.get('d');
-function abrirCofre(){if(navigator.vibrate)navigator.vibrate(15);$('cofre').classList.add('on');$('busca').value='';render();sync()}
-function fecharCofre(){$('cofre').classList.remove('on');$('lista').innerHTML='';$('busca').blur()}
+let abertoEm=0;
+document.addEventListener('click',e=>{if(Date.now()-abertoEm<500&&$('cofre').contains(e.target)){e.stopPropagation();e.preventDefault()}},true);
+function abrirCofre(){abertoEm=Date.now();if(navigator.vibrate)navigator.vibrate(15);$('cofre').classList.add('on');$('busca').value='';render();sync()}
+function fecharCofre(){if(ctrl){ctrl.abort();ctrl=null;sincronizando=false;$('bSync').textContent='Atualizar';$('bSync').disabled=false}$('cofre').classList.remove('on');$('lista').innerHTML='';$('busca').blur()}
 $('bSair').onclick=fecharCofre;
 $('bSync').onclick=()=>sync(true);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)fecharCofre()});
@@ -230,19 +235,22 @@ function telaConfig(){
     try{const c=JSON.parse(atob(decodeURIComponent(m?m[1]:t)));if(c.u&&c.k){LS.set('cfg',c);render();sync(true);return}}catch(e){}toast('Link inválido')};
 }
 
-let sincronizando=false;
+let sincronizando=false,ctrl=null;
 function quando(t){if(!t)return'';const m=Math.round((Date.now()-t)/60000);return m<1?'agora':m<60?'há '+m+' min':m<1440?'há '+Math.round(m/60)+' h':'há '+Math.round(m/1440)+' d'}
 function status(t){$('status').textContent=t||(dados?'Atualizado '+quando(dados.t):'')}
 async function sync(manual){
-  const cfg=LS.get('cfg');if(!cfg||sincronizando){status();return}
-  sincronizando=true;status('Sincronizando…');
+  const cfg=LS.get('cfg');if(!cfg){status();return}
+  if(ctrl)ctrl.abort();
+  ctrl=new AbortController();const meu=ctrl,to=setTimeout(()=>meu.abort(),15000);
+  sincronizando=true;status('Sincronizando…');const bt=$('bSync');bt.textContent='Atualizando…';bt.disabled=true;
   try{
-    const r=await fetch(cfg.u+'?k='+encodeURIComponent(cfg.k),{cache:'no-store',redirect:'follow'});
+    const r=await fetch(cfg.u+'?k='+encodeURIComponent(cfg.k),{cache:'no-store',redirect:'follow',signal:meu.signal});
     const j=await r.json();
     if(!j.ok)throw new Error('chave');
-    dados=j;LS.set('d',j);render();status();if(manual)toast('Atualizado');
-  }catch(e){status(dados?'Sem conexão · dados de '+quando(dados.t):'Sem conexão')}
-  sincronizando=false;
+    dados=j;LS.set('d',j);if($('cofre').classList.contains('on'))render();status();if(manual)toast('Atualizado');
+  }catch(e){if(meu===ctrl)status(dados?'Sem conexão · dados de '+quando(dados.t):'Sem conexão')}
+  clearTimeout(to);
+  if(meu===ctrl){ctrl=null;sincronizando=false;bt.textContent='Atualizar';bt.disabled=false}
 }
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
