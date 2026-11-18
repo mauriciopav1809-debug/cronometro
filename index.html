@@ -51,6 +51,12 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .it .ex{font-size:12px;color:var(--sub);margin-top:4px}
 .cp{background:var(--card2);color:var(--gold);padding:7px 12px;border-radius:8px;font-size:14px;flex:0 0 auto}
 .cp.ok{color:var(--green)}
+.acts{display:flex;gap:6px;flex:0 0 auto}
+.gen{padding:4px 12px 12px;border-bottom:1px solid #2c2c2e;display:none}
+.gen.on{display:block}
+.gen .pw{font-family:ui-monospace,Menlo,monospace;font-size:18px;background:#000;border-radius:8px;padding:10px;word-break:break-all;margin-bottom:8px;user-select:all;-webkit-user-select:all}
+.gen .row{display:flex;gap:6px}.gen .row .cp{flex:1}
+.cp.sv{color:var(--green)}
 #status{font-size:12px;color:var(--sub);text-align:center;padding:6px}
 #toast{position:fixed;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#333;color:#fff;padding:9px 16px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
@@ -153,6 +159,40 @@ function item(nome,valor,{mascara=false,copia=valor,mostra,extra=''}={}){
   return d;
 }
 
+function gerarSenha(n=16){
+  const U='ABCDEFGHJKLMNPQRSTUVWXYZ',L='abcdefghijkmnopqrstuvwxyz',D='23456789',S='@#?!$%&*';
+  const all=U+L+D+S,rnd=m=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%m};
+  const c=[U,L,D,S].map(x=>x[rnd(x.length)]);
+  while(c.length<n)c.push(all[rnd(all.length)]);
+  for(let i=c.length-1;i>0;i--){const j=rnd(i+1);[c[i],c[j]]=[c[j],c[i]]}
+  return c.join('');
+}
+function itemSenha(box,i){
+  const d=item(i.nome,i.senha);
+  const bg=document.createElement('button');bg.className='cp';bg.textContent='Gerar';
+  const acts=document.createElement('div');acts.className='acts';
+  const bc=d.querySelector('.cp');d.insertBefore(acts,bc);acts.appendChild(bg);acts.appendChild(bc);
+  const g=document.createElement('div');g.className='gen';
+  g.innerHTML='<div class="pw"></div><div class="row"><button class="cp b1">Outra</button><button class="cp b2">Copiar</button><button class="cp sv b3">Salvar</button></div>';
+  const pw=g.querySelector('.pw');
+  const nova=()=>{pw.textContent=gerarSenha()};
+  bg.onclick=e=>{e.stopPropagation();if(!g.classList.contains('on'))nova();g.classList.toggle('on')};
+  g.querySelector('.b1').onclick=nova;
+  g.querySelector('.b2').onclick=e=>copiar(pw.textContent,e.currentTarget);
+  const bs=g.querySelector('.b3');
+  bs.onclick=async()=>{
+    if(!i.r){toast('Atualize antes');return}
+    const cfg=LS.get('cfg'),v=pw.textContent;bs.textContent='Salvando…';bs.disabled=true;
+    try{
+      const r=await fetch(cfg.u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({k:cfg.k,s:i.s,r:i.r,n:i.nome,v})});
+      const j=await r.json();
+      if(!j.ok)throw new Error(j.erro||'');
+      i.senha=v;LS.set('d',dados);toast('Salva na planilha');render();
+    }catch(err){toast(err.message==='linha mudou'?'Planilha mudou, atualize':'Não salvou');bs.textContent='Salvar';bs.disabled=false}
+  };
+  box.appendChild(d);box.appendChild(g);
+}
+
 function render(){
   $('tit').textContent=aba==='s'?'Senhas':'Cartões';
   const L=$('lista');L.innerHTML='';
@@ -166,10 +206,7 @@ function render(){
       if(!its.length)return;
       const h=document.createElement('div');h.className='g';h.textContent=g.grupo;L.appendChild(h);
       const b=document.createElement('div');b.className='box';
-      its.forEach(i=>{
-        b.appendChild(item(i.nome,i.senha));
-        (i.extras||[]).forEach(x=>{const el=item(i.nome+' · '+x.rotulo,x.valor);el.style.paddingLeft='26px';b.appendChild(el)});
-      });
+      its.forEach(i=>itemSenha(b,i));
       L.appendChild(b);
     });
   }else{
