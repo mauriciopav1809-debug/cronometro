@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cronômetro">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex">
+<title>Cronômetro</title>
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<style>
+:root{--bg:#000;--card:#1c1c1e;--card2:#2c2c2e;--txt:#fff;--sub:#8e8e93;--green:#30d158;--red:#ff453a;--gold:#ffd60a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif;overscroll-behavior:none}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+/* Cronômetro */
+#sw{display:flex;flex-direction:column;height:100%;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#tempo{flex:0 0 auto;height:42vh;display:flex;align-items:center;justify-content:center;font-size:min(21vw,96px);font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.btns{display:flex;justify-content:space-between;padding:0 18px 18px}
+.rb{width:84px;height:84px;border-radius:50%;font-size:17px;position:relative}
+.rb::after{content:"";position:absolute;inset:3px;border-radius:50%;border:2px solid #000}
+#bVolta{background:#333;color:#fff}#bVolta:disabled{color:#888}
+#bIni{background:#0a3a17;color:var(--green)}#bIni.on{background:#3c0f0c;color:var(--red)}
+#voltas{flex:1;overflow:auto;margin:0 18px;border-top:1px solid #222;list-style:none;padding:0}
+#voltas li{display:flex;justify-content:space-between;padding:11px 2px;border-bottom:1px solid #222;font-variant-numeric:tabular-nums;font-size:17px}
+#voltas li.min{color:var(--green)}#voltas li.max{color:var(--red)}
+/* Cofre */
+#cofre{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#cofre.on{display:flex}
+.top{display:flex;align-items:center;gap:8px;padding:10px 14px 6px}
+.top h1{flex:1;font-size:28px;margin:0}
+.ic{padding:6px 10px;color:var(--gold);font-size:16px}
+.seg{display:flex;margin:4px 14px 8px;background:var(--card);border-radius:9px;padding:2px}
+.seg button{flex:1;padding:7px;border-radius:7px;font-size:14px;color:var(--sub)}
+.seg button.on{background:#636366;color:#fff}
+#busca{margin:0 14px 8px;padding:9px 12px;border-radius:10px;border:0;background:var(--card);color:#fff;font-size:16px}
+#lista{flex:1;overflow:auto;padding:0 14px 30px}
+.g{color:var(--sub);font-size:13px;text-transform:uppercase;margin:16px 4px 6px}
+.box{background:var(--card);border-radius:12px;overflow:hidden}
+.it{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid #2c2c2e}
+.it:last-child{border-bottom:0}
+.it .tx{flex:1;min-width:0}
+.it .n{font-size:16px}
+.it .v{font-size:15px;color:var(--sub);font-family:ui-monospace,Menlo,monospace;word-break:break-all;margin-top:2px}
+.it .v.vis{color:#fff}
+.it .ex{font-size:12px;color:var(--sub);margin-top:4px}
+.cp{background:var(--card2);color:var(--gold);padding:7px 12px;border-radius:8px;font-size:14px;flex:0 0 auto}
+.cp.ok{color:var(--green)}
+#status{font-size:12px;color:var(--sub);text-align:center;padding:6px}
+#toast{position:fixed;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#333;color:#fff;padding:9px 16px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+#cfgBox{padding:14px}
+#cfgBox textarea{width:100%;height:110px;background:var(--card);color:#fff;border:0;border-radius:10px;padding:10px;font-size:13px}
+#cfgBox button{margin-top:10px;background:var(--card2);color:var(--gold);padding:10px 16px;border-radius:9px}
+</style>
+</head>
+<body>
+<div id="sw">
+  <div id="tempo">00:00,00</div>
+  <div class="btns">
+    <button class="rb" id="bVolta" disabled>Volta</button>
+    <button class="rb" id="bIni">Iniciar</button>
+  </div>
+  <ul id="voltas"></ul>
+</div>
+
+<div id="cofre">
+  <div class="top"><h1 id="tit">Senhas</h1><button class="ic" id="bSync">Atualizar</button><button class="ic" id="bSair">Fechar</button></div>
+  <div class="seg"><button id="tS" class="on">Senhas</button><button id="tC">Cartões</button></div>
+  <input id="busca" type="search" placeholder="Buscar" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <div id="lista"></div>
+  <div id="status"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const LS={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- Cronômetro ---------- */
+let ini=0,acum=0,rodando=false,raf=0,voltas=[],ultVolta=0;
+const fmt=ms=>{const c=Math.floor(ms/10)%100,s=Math.floor(ms/1000)%60,m=Math.floor(ms/60000);return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+','+String(c).padStart(2,'0')};
+const agora=()=>acum+(rodando?performance.now()-ini:0);
+function tick(){$('tempo').textContent=fmt(agora());if(rodando)raf=requestAnimationFrame(tick)}
+function renderVoltas(){
+  const ul=$('voltas');ul.innerHTML='';
+  const ds=voltas.map(v=>v.d);const mn=Math.min(...ds),mx=Math.max(...ds);
+  voltas.slice().reverse().forEach((v,i)=>{const li=document.createElement('li');
+    if(voltas.length>2){if(v.d===mn)li.className='min';else if(v.d===mx)li.className='max'}
+    li.innerHTML='<span>Volta '+(voltas.length-i)+'</span><span>'+fmt(v.d)+'</span>';ul.appendChild(li)});
+}
+$('bIni').onclick=()=>{
+  if(rodando){acum+=performance.now()-ini;rodando=false;cancelAnimationFrame(raf);$('bIni').textContent='Iniciar';$('bIni').classList.remove('on');$('bVolta').textContent='Zerar'}
+  else{ini=performance.now();rodando=true;tick();$('bIni').textContent='Parar';$('bIni').classList.add('on');$('bVolta').textContent='Volta';$('bVolta').disabled=false}
+};
+$('bVolta').onclick=()=>{
+  if(rodando){const t=agora();voltas.push({d:t-ultVolta});ultVolta=t;renderVoltas()}
+  else{acum=0;voltas=[];ultVolta=0;$('tempo').textContent=fmt(0);$('voltas').innerHTML='';$('bVolta').textContent='Volta';$('bVolta').disabled=true}
+};
+
+/* ---------- Gesto secreto: segurar o visor por 1,5 s ---------- */
+let hold=0;
+const tempo=$('tempo');
+const startHold=e=>{clearTimeout(hold);hold=setTimeout(abrirCofre,1500)};
+const endHold=()=>clearTimeout(hold);
+tempo.addEventListener('touchstart',startHold,{passive:true});
+tempo.addEventListener('touchend',endHold);tempo.addEventListener('touchmove',endHold,{passive:true});tempo.addEventListener('touchcancel',endHold);
+tempo.addEventListener('mousedown',startHold);tempo.addEventListener('mouseup',endHold);tempo.addEventListener('mouseleave',endHold);
+tempo.addEventListener('contextmenu',e=>e.preventDefault());
+
+/* ---------- Configuração (vem no link #c=...) ---------- */
+function lerCfgDoLink(){
+  const m=location.hash.match(/[#&]c=([^&]+)/);if(!m)return;
+  try{const c=JSON.parse(atob(decodeURIComponent(m[1])));if(c.u&&c.k)LS.set('cfg',c)}catch(e){}
+}
+lerCfgDoLink();
+
+/* ---------- Cofre ---------- */
+let aba='s',dados=LS.get('d');
+function abrirCofre(){if(navigator.vibrate)navigator.vibrate(15);$('cofre').classList.add('on');$('busca').value='';render();sync()}
+function fecharCofre(){$('cofre').classList.remove('on');$('lista').innerHTML='';$('busca').blur()}
+$('bSair').onclick=fecharCofre;
+$('bSync').onclick=()=>sync(true);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)fecharCofre()});
+window.addEventListener('pagehide',fecharCofre);
+$('tS').onclick=()=>{aba='s';$('tS').classList.add('on');$('tC').classList.remove('on');$('busca').style.display='';render()};
+$('tC').onclick=()=>{aba='c';$('tC').classList.add('on');$('tS').classList.remove('on');$('busca').style.display='none';render()};
+$('busca').oninput=render;
+
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),1300)}
+function copiar(txt,btn){
+  const ok=()=>{toast('Copiado');if(btn){btn.classList.add('ok');btn.textContent='Copiado';setTimeout(()=>{btn.classList.remove('ok');btn.textContent='Copiar'},1300)}};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(ok,()=>fb())}else fb();
+  function fb(){const ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,99999);try{document.execCommand('copy');ok()}catch(e){toast('Falhou')}ta.remove()}
+}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mask=s=>'•'.repeat(Math.min(Math.max(String(s).length,6),12));
+
+function item(nome,valor,{mascara=true,copia=valor,mostra,extra=''}={}){
+  const d=document.createElement('div');d.className='it';
+  const oculto=mascara?(mostra||mask(valor)):valor;
+  d.innerHTML='<div class="tx"><div class="n">'+esc(nome)+'</div><div class="v'+(mascara?'':' vis')+'">'+esc(oculto)+'</div>'+extra+'</div><button class="cp">Copiar</button>';
+  const v=d.querySelector('.v');
+  if(mascara){d.querySelector('.tx').onclick=()=>{const vis=v.classList.toggle('vis');v.textContent=vis?valor:oculto}}
+  d.querySelector('.cp').onclick=e=>{e.stopPropagation();copiar(copia,e.currentTarget)};
+  return d;
+}
+
+function render(){
+  $('tit').textContent=aba==='s'?'Senhas':'Cartões';
+  const L=$('lista');L.innerHTML='';
+  const cfg=LS.get('cfg');
+  if(!cfg){return telaConfig()}
+  if(!dados){L.innerHTML='<div id="status">Carregando…</div>';return}
+  if(aba==='s'){
+    const q=$('busca').value.trim().toLowerCase();
+    (dados.senhas||[]).forEach(g=>{
+      const its=g.itens.filter(i=>!q||i.nome.toLowerCase().includes(q)||g.grupo.toLowerCase().includes(q));
+      if(!its.length)return;
+      const h=document.createElement('div');h.className='g';h.textContent=g.grupo;L.appendChild(h);
+      const b=document.createElement('div');b.className='box';
+      its.forEach(i=>{
+        b.appendChild(item(i.nome,i.senha));
+        (i.extras||[]).forEach(x=>{const el=item(i.nome+' · '+x.rotulo,x.valor);el.style.paddingLeft='26px';b.appendChild(el)});
+      });
+      L.appendChild(b);
+    });
+  }else{
+    (dados.cartoes||[]).forEach(c=>{
+      const h=document.createElement('div');h.className='g';h.textContent=c.titulo;L.appendChild(h);
+      const b=document.createElement('div');b.className='box';
+      c.campos.forEach(f=>{
+        const r=f.rotulo.toLowerCase();
+        if(/n[uú]mero/.test(r)){const dig=f.valor.replace(/\D/g,'');b.appendChild(item(f.rotulo,f.valor,{copia:dig,mostra:'•••• '+dig.slice(-4)}))}
+        else if(/cv[cv]|c[oó]d/.test(r))b.appendChild(item(f.rotulo,f.valor,{mostra:'•••'}));
+        else b.appendChild(item(f.rotulo,f.valor,{mascara:false}));
+      });
+      L.appendChild(b);
+    });
+  }
+}
+
+function telaConfig(){
+  const L=$('lista');
+  L.innerHTML='<div id="cfgBox"><div class="g">Configuração</div><textarea id="cfgTx" placeholder="Cole aqui o link de instalação"></textarea><button id="cfgOk">Salvar</button></div>';
+  $('cfgOk').onclick=()=>{const t=$('cfgTx').value.trim();const m=t.match(/c=([^&\s]+)/);
+    try{const c=JSON.parse(atob(decodeURIComponent(m?m[1]:t)));if(c.u&&c.k){LS.set('cfg',c);render();sync(true);return}}catch(e){}toast('Link inválido')};
+}
+
+let sincronizando=false;
+function quando(t){if(!t)return'';const m=Math.round((Date.now()-t)/60000);return m<1?'agora':m<60?'há '+m+' min':m<1440?'há '+Math.round(m/60)+' h':'há '+Math.round(m/1440)+' d'}
+function status(t){$('status').textContent=t||(dados?'Atualizado '+quando(dados.t):'')}
+async function sync(manual){
+  const cfg=LS.get('cfg');if(!cfg||sincronizando){status();return}
+  sincronizando=true;status('Sincronizando…');
+  try{
+    const r=await fetch(cfg.u+'?k='+encodeURIComponent(cfg.k),{cache:'no-store',redirect:'follow'});
+    const j=await r.json();
+    if(!j.ok)throw new Error('chave');
+    dados=j;LS.set('d',j);render();status();if(manual)toast('Atualizado');
+  }catch(e){status(dados?'Sem conexão · dados de '+quando(dados.t):'Sem conexão')}
+  sincronizando=false;
+}
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
